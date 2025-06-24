@@ -1,0 +1,72 @@
+version: "3.8"
+
+services:
+  # Backend API Service
+  backend:
+    build:
+      context: ./token-metrics-service
+      dockerfile: Dockerfile
+    container_name: token-metrics-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - CMC_API_KEY=818acf4e-ce65-4d5e-8c2d-81135b5572e5
+      - CMC_BASE_URL=https://sandbox-api.coinmarketcap.com/v1
+      - SECRET_KEY=mosin-shaikh
+    volumes:
+      - backend_data:/app/src/database
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:5000/api/v1/tokens?limit=1",
+          "-H",
+          "X-API-Key: demo-api-key-12345678",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - token-metrics-network
+
+  # Frontend Dashboard
+  frontend:
+    build:
+      context: ./token-metrics-dashboard
+      dockerfile: Dockerfile
+    container_name: token-metrics-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - token-metrics-network
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: token-metrics-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    networks:
+      - token-metrics-network
+
+volumes:
+  backend_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  token-metrics-network:
+    driver: bridge
